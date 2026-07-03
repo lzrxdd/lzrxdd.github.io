@@ -1,35 +1,236 @@
-extends includes/layout.pug
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>AWR2243固件开发学习经验_1 | Azusa的数据库</title><meta name="author" content="Azusa"><meta name="copyright" content="Azusa"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="一. 研究背景仅以此系列文章记录个人在摸索学习AWR2243级联雷达时所涉及的一些经验，供后续回顾复习以及他人学习交流。本系列仅针对如何从原本mmWavestudio的脚本控制转向嵌入式固件运行，从而适应各种独立部署环境。 1.1 设备组成设备整体由MMWCAS-DSP-EVM与MMWCAS-RF-EVM两块板组成前者用来处理射频板的雷达数据信号，给射频板输入5V供电，可以进行信号处理，比如FFT">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AWR2243固件开发学习经验_1">
+<meta property="og:url" content="https://lzrxdd.github.io/2026/07/03/firmware%20development%20experience_1/index.html">
+<meta property="og:site_name" content="Azusa的数据库">
+<meta property="og:description" content="一. 研究背景仅以此系列文章记录个人在摸索学习AWR2243级联雷达时所涉及的一些经验，供后续回顾复习以及他人学习交流。本系列仅针对如何从原本mmWavestudio的脚本控制转向嵌入式固件运行，从而适应各种独立部署环境。 1.1 设备组成设备整体由MMWCAS-DSP-EVM与MMWCAS-RF-EVM两块板组成前者用来处理射频板的雷达数据信号，给射频板输入5V供电，可以进行信号处理，比如FFT">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://lzrxdd.github.io/img/butterfly-icon.png">
+<meta property="article:published_time" content="2026-07-03T05:50:03.000Z">
+<meta property="article:modified_time" content="2026-07-03T17:13:06.396Z">
+<meta property="article:author" content="Azusa">
+<meta property="article:tag" content="C++, Python, 信号处理, 嵌入式">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://lzrxdd.github.io/img/butterfly-icon.png"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "AWR2243固件开发学习经验_1",
+  "url": "https://lzrxdd.github.io/2026/07/03/firmware%20development%20experience_1/",
+  "image": "https://lzrxdd.github.io/img/butterfly-icon.png",
+  "datePublished": "2026-07-03T05:50:03.000Z",
+  "dateModified": "2026-07-03T17:13:06.396Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Azusa",
+      "url": "https://lzrxdd.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://lzrxdd.github.io/2026/07/03/firmware%20development%20experience_1/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
 
-block content
-  #post
-    if top_img === false
-      include includes/header/post-info.pug
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
 
-    article#article-container.container.post-content
-      if theme.noticeOutdate.enable && page.noticeOutdate !== false
-        include includes/post/outdate-notice.pug
-      else
-        !=page.content
-    include includes/post/post-copyright.pug
-    .tag_share
-      if (page.tags.length > 0 && theme.post_meta.post.tags)
-        .post-meta__tag-list
-          each item, index in page.tags.data
-            a(href=url_for(item.path)).post-meta__tags #[=item.name]
-      include includes/third-party/share/index.pug
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
 
-    if theme.reward.enable && theme.reward.QR_code
-      !=partial('includes/post/reward', {}, {cache: true})
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'AWR2243固件开发学习经验_1',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 8.1.2"></head><body><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">Azusa的数据库</span></a><a class="nav-page-title" href="/"><span class="site-name">AWR2243固件开发学习经验_1</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"></div></nav><div id="post-info"><h1 class="post-title">AWR2243固件开发学习经验_1</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-07-03T05:50:03.000Z" title="发表于 2026-07-03 13:50:03">2026-07-03</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-07-03T17:13:06.396Z" title="更新于 2026-07-04 01:13:06">2026-07-04</time></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h2 id="一-研究背景"><a href="#一-研究背景" class="headerlink" title="一. 研究背景"></a>一. 研究背景</h2><p>仅以此系列文章记录个人在摸索学习AWR2243级联雷达时所涉及的一些经验，供后续回顾复习以及他人学习交流。本系列仅针对如何从原本mmWavestudio的脚本控制转向嵌入式固件运行，从而适应各种独立部署环境。</p>
+<h3 id="1-1-设备组成"><a href="#1-1-设备组成" class="headerlink" title="1.1 设备组成"></a>1.1 设备组成</h3><p>设备整体由MMWCAS-DSP-EVM与MMWCAS-RF-EVM两块板组成前者用来处理射频板的雷达数据信号，给射频板输入5V供电，可以进行信号处理，比如FFT、CFAR等。其搭载的是TDA2x处理器，而不是带视觉ISP的TDA2Px，这对后面的程序设定有帮助。<br>DSP板我在当前开发中主要用到的接口有：Ethernet Port（网口）、UART&#x2F;Terminal（Mini USB(mini-B)）、Pwr Input（电源线）</p>
+<div align="center">
+  <img src="images/DSP板接口实图.png" width="60%">
+  <p>图 1：DSP板正面图</p>
+</div>
 
-    //- ad
-    if theme.ad && theme.ad.post
-      .ads-wrap!=theme.ad.post
+<p>从下图的功能原理框图可以看到，60-Pin MIPI Debug Header与TDA2x板的JTAG口直接连接，因此主板上并没有集成仿真器，我也并没有MIPI-60的线，因此并不能直接使用CCS联机调试（JTAG烧录），只能用SD卡启动，不过也好，一块SD卡也不贵，省了不少钱。</p>
+<div align="center">
+  <img src="images/功能原理框图.png" width="60%">
+  <p>图 2：功能原理框图</p>
+</div>
 
-    if theme.post_pagination
-      include includes/pagination.pug
-    if theme.related_post && theme.related_post.enable
-      != related_posts(page,site.posts)
+<p>了解了基本结构后，我们便可以开始着手从TI的官方SDK里开始学习开发了。</p>
+<h3 id="1-2-功能"><a href="#1-2-功能" class="headerlink" title="1.2 功能"></a>1.2 功能</h3><p>在先前的lua脚本中，我们已经实现了脉冲的配置与采集数据保存的功能，并且后续的数据处理采用了matlab，可以绘制出距离-方位图、距离-速度图、速度-时间图、目标点云图等，但先不提采集数据与处理数据并不同步的缺点，连采集数据都必须连接电脑，哪怕使用了延迟脚本，雷达依然需要开着mmWavestudio，十分不方便，这些功能最好都集成到DSP板上。<br>脉冲配置与数据处理可以参考：<a target="_blank" rel="noopener" href="https://blog.csdn.net/Eric_Lee7/article/details/125010807?fromshare=blogdetail&sharetype=blogdetail&sharerId=125010807&sharerefer=PC&sharesource=&sharefrom=from_link">TI毫米波级联雷达评估板 MMWCAS-DSP-EVM 和MMWCAS-RF-EVM</a><br>任务流应该为：ARM核心负责主控程序，初始化4个雷达芯片，并启动级联触发；TDA2接收射频板通过CSI-2传入的高速数据流，并转运至DDR内存；接收到数据后DSP便可以通过触发中断开始各种FFT以及CFAR目标检测等，后续也可以生成目标点云图。最终处理后的数据可以通过以太网，将点云坐标或热力图矩阵传至上位机。</p>
+<h2 id="二-开始动手"><a href="#二-开始动手" class="headerlink" title="二. 开始动手"></a>二. 开始动手</h2><h3 id="2-1-开发环境"><a href="#2-1-开发环境" class="headerlink" title="2.1 开发环境"></a>2.1 开发环境</h3><p>首先下载CCS(Code Composer Studio)，我用的是CCS 21.0.0，该版本已经抛弃了原本的Eclipse架构，现在长的跟VScode一样，所以网上有些教程过时了，不过影响主要是一些基本操作，比如工作空间设置还有工程导入那些，问题不大。</p>
+<p>接着，对于TDA2xx系列芯片，需要从官网下载<a target="_blank" rel="noopener" href="https://www.ti.com.cn/tool/cn/download/PROCESSOR-SDK-RADAR/03.08.00.00">PROCESSOR-SDK-RADAR</a>,选择Installer Package for Windows的那个。安装时直接放在默认路径C:\PROCESSOR_SDK_RADAR_03_08_00_00，里面的代码往往写得很死，后面我也会提到这一点的例子。</p>
+<p>此外还需要Tera Term进行串口监听，用USB将TDA2板子与电脑相连后，选择对应的COM口，设置-串口-比特率115200-New setting。</p>
+<p>安装gcc-arm-none-eabi，在这里<a target="_blank" rel="noopener" href="https://developer.arm.com/downloads/-/gnu-rm">下载</a>，如果下载的是4.9.3版本，则不需要管下面的操作；如果下载的是后续版本，比如我的5.4.1，则需要复制一份欺骗一下TI的程序，因为程序写死了要用4.9.3<br>文件管理器打开：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\ti_components\cg_tools\windows\gcc-arm-none-eabi-4_9-2015q3\lib\gcc\arm-none-eabi\</span><br></pre></td></tr></table></figure>
+<p>将5.4.1文件夹复制一份在原地，然后改成4.9.3，这样5.4.1可以留给GCC编译器自己用，4.9.3给TI程序寻址。用简单粗暴的方法解决就行了。</p>
+<h3 id="2-2-修改文件"><a href="#2-2-修改文件" class="headerlink" title="2.2 修改文件"></a>2.2 修改文件</h3><p>在CCS里打开文件夹：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\vision_sdk</span><br></pre></td></tr></table></figure>
+<p>然后找到</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\vision_sdk\apps\src\rtos\radar\src\common\chains_common_cascade_ar12xx_config_mimo.c</span><br></pre></td></tr></table></figure>
+<p>这里包含了大量的参数配置，主程序会把这些结构体通过SPI发送给4个级联芯片。<br>到达这里就可以看到lua脚本里一些熟悉的变量与参数了，比如：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">CHAINS_CASCADE_RADAR_PROFILE1_RADAR_WIDTH (<span class="number">256U</span>) <span class="comment">//对应采样点数adc_samples = 256；</span></span><br><span class="line">CHAINS_CASCADE_RADAR_SAMPLING_RATE_KSPS (<span class="number">8000U</span>) <span class="comment">//对应采样频率sample_freq = 8000；</span></span><br><span class="line">CHAINS_CASCADE_RADAR_ADC_START_TIME_IN_US (<span class="number">6U</span>) <span class="comment">//对应adc开始时间adc_start_time = 6(us)；</span></span><br><span class="line">CHAINS_CASCADE_RADAR_IDLE_TIME_IN_US (<span class="number">5U</span>) <span class="comment">//对应空闲时间idle_time = 5(us)；</span></span><br><span class="line">CHAINS_CASCADE_RADAR_RAMP_END_TIME_IN_US (<span class="number">40U</span>) <span class="comment">//对应斜坡结束时间ramp_end_time = 40(us)；</span></span><br><span class="line">CHAINS_CASCADE_RADAR_SLOPE_MHZ_PER_US (<span class="number">79U</span>) <span class="comment">//对应斜坡斜率slope = 79；</span></span><br><span class="line">CSI_DATA_RATE (<span class="number">600U</span>)与ADC_DATA_FORMAT (<span class="number">16U</span>) <span class="comment">//确保高速传输数据时不丢包。</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> CHAINS_CASCADE_RADAR_RADAR_HEIGHT   (64U)</span></span><br></pre></td></tr></table></figure>
+<p>这里点名批评变量命名方式，看字面意思是雷达高度，可是其值却是64，显然64不是高度。这里应该是指64个chirp loops(NUM_CHIRP_LOOPS)，谷歌豆包Gemini告诉我：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">&quot;这源于 TI 在 Vision SDK 时代的历史遗留命名习惯。</span></span><br><span class="line"><span class="string">Vision SDK 最早是为摄像头（Camera）开发的，处理的是 2D 图像（Width x Height）。</span></span><br><span class="line"><span class="string">当雷达团队把代码合入这个框架时，他们为了迎合图像处理的内存分配架构，做了一个强行映射：</span></span><br><span class="line"><span class="string">    Width (宽度): 对应每个 Chirp 的 ADC 采样点数（adc_samples = 256）。</span></span><br><span class="line"><span class="string">    Height (高度): 对应一个 Frame 里的 Chirp 循环数（nchirp_loops = 64）。</span></span><br><span class="line"><span class="string">在雷达内存里，一帧数据就是一张 256 (宽) x 64 (高) 的二维矩阵。&quot;</span></span><br></pre></td></tr></table></figure>
+<p>具体其他代码是干什么的可以丢给AI解释，这里暂时不需要修改，也不多介绍。<br>找到CHAINS_CASCADE_CHIRP_END_IDX，可以看到其值为9，故这个程序原本只设定了10个chirp，根据实际需要可以进行修改，如果将其设为11，即12个chirp，则后面还需要扩充与修改数组：<br>找到4个命名为gChains_cascadeRadarChirpCfgArgsXXX(XXX为Master、Slave_DevIdxMap2等)的数组，分别对应了Master、Slave1 (Map2)、Slave2 (Map4)、Slave3 (Map8)四个芯片。<br>以gChains_cascadeRadarChirpCfgArgsMaster为例，应该修改为：</p>
+<blockquote>
+<p>注意，修改前记得保存一份原始的文件作为模板。</p>
+</blockquote>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br></pre></td><td class="code"><pre><span class="line">rlChirpCfg_t   gChains_cascadeRadarChirpCfgArgsMaster[CHAINS_RADAR_MAX_NUM_CHIRP_CFG] =</span><br><span class="line">&#123;</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x1</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x1</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x2</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x2</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x3</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x3</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x4</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x4</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x5</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x5</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x6</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x6</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x7</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x7</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>, </span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x8</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x8</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0x9</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0x9</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x4</span>,    <span class="comment">//Dev1 的 TX2 开启</span></span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0xA</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0xA</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x2</span>,    <span class="comment">//Dev1 的 TX1 开启</span></span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        .chirpStartIdx   = (rlUInt16_t) <span class="number">0xB</span>,</span><br><span class="line">        .chirpEndIdx     = (rlUInt16_t) <span class="number">0xB</span>,</span><br><span class="line">        .profileId       = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .startFreqVar    = (rlUInt32_t) <span class="number">0x0</span>,</span><br><span class="line">        .freqSlopeVar    = (rlUInt16_t)  <span class="number">0x0</span>,</span><br><span class="line">        .idleTimeVar     = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .adcStartTimeVar = (rlUInt16_t) <span class="number">0x0</span>,</span><br><span class="line">        .txEnable        = (rlUInt16_t) <span class="number">0x1</span>,    <span class="comment">//Dev1 的 TX0 开启</span></span><br><span class="line">        .reserved        = (rlUInt16_t) <span class="number">0x0</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>以此类推，修改：<br>Slave_DevIdxMap2 (即 Dev2)：在 Chirp 6, 7, 8 处，将 txEnable 分别设为 0x4 (TX2), 0x2 (TX1), 0x1 (TX0)，其余全为 0x0；<br>Slave_DevIdxMap4 (即 Dev3)：在 Chirp 3, 4, 5 处，将 txEnable 分别设为 0x4, 0x2, 0x1，其余为 0x0；<br>Slave_DevIdxMap8 (即 Dev4)：在 Chirp 0, 1, 2 处，将 txEnable 分别设为 0x4, 0x2, 0x1，其余为 0x0。</p>
+<p>找到</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\vision_sdk\apps\configs\tda2xx_evm_bios_radar</span><br></pre></td></tr></table></figure>
+<p>打开cfg.mk，将原本的RADAR_BOARD&#x3D;none，修改为<br>RADAR_BOARD&#x3D;TDA2XX_CASCADE_RADAR<br>并且由于级联雷达的数据量过大，TDA2xx芯片的4个EVE协处理器都需要全开，因此要在cfg,mk找到并修改为以下内容：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># CPUs to included in build</span></span><br><span class="line"><span class="comment">#</span></span><br><span class="line">PROC_IPU1_0_INCLUDE=<span class="built_in">yes</span></span><br><span class="line">PROC_IPU1_1_INCLUDE=<span class="built_in">yes</span></span><br><span class="line">PROC_IPU2_INCLUDE=no</span><br><span class="line">PROC_A15_0_INCLUDE=<span class="built_in">yes</span></span><br><span class="line">PROC_DSP1_INCLUDE=<span class="built_in">yes</span></span><br><span class="line">PROC_DSP2_INCLUDE=no</span><br><span class="line">PROC_EVE1_INCLUDE=<span class="built_in">yes</span></span><br><span class="line">PROC_EVE2_INCLUDE=<span class="built_in">yes</span></span><br><span class="line">PROC_EVE3_INCLUDE=<span class="built_in">yes</span></span><br><span class="line">PROC_EVE4_INCLUDE=<span class="built_in">yes</span></span><br></pre></td></tr></table></figure>
 
-    if page.comments !== false && theme.comments.use
-      - var commentsJsLoad = true
-      !=partial('includes/third-party/comments/index', {}, {cache: true})
+<p>找到同文件夹下的uc_cfg.mk，在文件最下面添加</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">UC_cascade_radar_capture_only=<span class="built_in">yes</span></span><br><span class="line">UC_cascade_radar_object_detect=<span class="built_in">yes</span></span><br></pre></td></tr></table></figure>
+<p>这两个分别是纯采集和带目标检测的采集。</p>
+<h3 id="2-3-编译"><a href="#2-3-编译" class="headerlink" title="2.3 编译"></a>2.3 编译</h3><p>修改完配置文件后，接下来便可以开始编译，得到可执行的固件了。不过首先要注意Processor SDK很大，有专属的Makefile，因此不能直接在IDE里点编译，需要在终端里使用gmake，它会使用当前文件夹内的Makefile里的规则进行编译：<br>(1) 打开cmd，用cd进入</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\vision_sdk\build</span><br></pre></td></tr></table></figure>
+<p>打开C:\PROCESSOR_SDK_RADAR_03_08_00_00\vision_sdk\build下的Rules.make，找到原本的：<br>MAKECONFIG?&#x3D;tda3xx_evm_bios_radar<br>根据自己的TDA2x板的型号进行更改</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">支持的硬件型号在这段代码下面有列出</span><br><span class="line"><span class="comment"># Supported &quot;out of box&quot; configs are listed below</span></span><br></pre></td></tr></table></figure>
+<p>我根据自己的设备，将其更改为<br>MAKECONFIG?&#x3D;tda2xx_evm_bios_radar<br>(2) 输入<br>假如下面过程运行出过错误，修改后需要再次运行，则要先运行一次清理：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\ti_components\os_tools\windows\xdctools_3_32_01_22_core\gmake.exe -s -j clean</span><br></pre></td></tr></table></figure>
+<p>如果第一次，则可以直接运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\ti_components\os_tools\windows\xdctools_3_32_01_22_core\gmake.exe -s -j makeconfig</span><br></pre></td></tr></table></figure>
+<p>生成头文件；接着运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\ti_components\os_tools\windows\xdctools_3_32_01_22_core\gmake.exe -s -j depend</span><br></pre></td></tr></table></figure>
+<p>结束后继续输入：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\ti_components\os_tools\windows\xdctools_3_32_01_22_core\gmake.exe -s -j</span><br></pre></td></tr></table></figure>
+<p>如果一切顺利，则结果保存在：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:/PROCESSOR_SDK_RADAR_03_08_00_00/vision_sdk/binaries/apps/tda3xx_evm_bios_radar/vision_sdk/bin/tda3xx-evm</span><br></pre></td></tr></table></figure>
+<p>.xem4 (IPU 固件 - Cortex-M4 核心)，其运行在TDA2xx的IPU上，负责系统调度，控制外设接口等，可以向射频板发送指令。<br>.xe66 (DSP 固件 - C66x 核心)，可以运行一些自己写的算法，比如Range-Doppler FFT。<br>.xa15fg (MPU 固件 - Cortex-A15 核心)，主控程序。</p>
+<p>由于没有板载仿真器，不能使用CCS，因此只能用SD Card Boot，将原先的固件打包为一个系统装在SD卡里。<br>cmd依旧在vision_sdk\build路径下运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\ti_components\os_tools\windows\xdctools_3_32_01_22_core\gmake.exe -s -j appimage</span><br></pre></td></tr></table></figure>
+<p>可以将各个独立核心文件合并为一个叫AppImage的文件，保存在：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\vision_sdk\binaries\apps\tda2xx_evm_bios_radar\vision_sdk\bin\tda2xx-evm\sbl_boot</span><br></pre></td></tr></table></figure>
+<p>可能会生成多个文件，比如AppImage_BE和AppImage_LE，不用管，只用AppImage就行。把文件保存在桌面备用。<br>接着编译底层引导程序MLO：<br>在vision_sdk\build路径下运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\ti_components\os_tools\windows\xdctools_3_32_01_22_core\gmake.exe -s -j sbl</span><br></pre></td></tr></table></figure>
+<p>sbl (Secondary Boot Loader) 会生成MLO文件，相当于电脑主板的 BIOS，负责在开机瞬间把内存跑通，并把 AppImage 从 SD 卡里拉起来。<br>在文件管理器里找到</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\PROCESSOR_SDK_RADAR_03_08_00_00\vision_sdk\binaries\apps\tda2xx_evm_bios_radar\sbl\sd</span><br></pre></td></tr></table></figure>
+<p>可以看到4个文件夹，分别是opp_high、opp_low、opp_nom、opp_od，这里是由于TI存在动态电压与频率调节，TI编译一次会生成不同性能模式的引导程序。<br>opp_nom (Nominal - 标称模式)： 这是芯片的标准运行频率和电压。该版本比较稳定。<br>opp_high (High - 高性能模式)： 芯片处于超频或满血状态，DSP 和 ARM 核心跑在最高频率。性能最强，但功耗最大，主板发热也会增加。<br>opp_od (OverDrive - 极速&#x2F;过载模式)： 介于 Nominal 和 High 之间的一种特殊压榨性能模式。<br>opp_low (Low - 低功耗模式)： 降频运行，省电，但可能处理不了 4 芯片级联的数据吞吐量。<br>显然我们使用nom标称模式就行了。打开opp_nom\tda2xx-evm-radar找到MLO即可，注意先不要放进SD卡里，复制到桌面备用。</p>
+<h3 id="2-4-保存与上电"><a href="#2-4-保存与上电" class="headerlink" title="2.4 保存与上电"></a>2.4 保存与上电</h3><p>准备一张SD卡，将其格式化为FAT32格式，如果空间大于32G，其格式可能是exFAT，这时要用DiskGenius来进行格式化。DiskGenius可以在图吧工具箱里找到。注意格式化时要先删除当前分区，保存后，再新建分区。<br>考虑到TI 的 Boot ROM可能比较死板，MLO需要在扇区的最前面，SD卡格式完毕后，先将MLO复制进去，再复制AppImage进去。<br>接着要将雷达调整为SD卡模式。如果你先前就已经用mmWavestudio成功让雷达跑起来过，则不需要调整User Boot SW。</p>
+<p>到这里我们一整条流程走完了，接下来就要上电启动试试看了！将雷达电源接上，USB线连接，由于暂时没有写信号处理与保存，所以可以不接网线。把准备好的SD卡从读卡器上拿下来，插进DSP板的卡槽，注意先前配制好端口与波特率的Tera Term，可以看到雷达的启动日志，并且会给出两个功能选项，展示结果应该包含以下内容：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">[IPU1-0]  RADAR Usecases</span><br><span class="line">[IPU1-0]  ---------------</span><br><span class="line">[IPU1-0]</span><br><span class="line">[IPU1-0]  6: Null Source (SD/Network) Input + Radar FFT (EVE1) + Null (SD/Network)</span><br><span class="line">[IPU1-0]  8: Null Source (SD) Input + Radar Object Detect (EVE1) + Null (SD)</span><br><span class="line">[IPU1-0]  9: Cascade Radar (4 AWR1243) Capture + Null (TDA2xx Only)</span><br><span class="line">[IPU1-0]  a: Cascade Radar (4 AWR1243) Capture + Radar Object Detect (DSP) + NetworkTx (TDA2xx Only)</span><br><span class="line">[IPU1-0]</span><br><span class="line">[IPU1-0]  x: Exit</span><br><span class="line">[IPU1-0]</span><br><span class="line">[IPU1-0]  Enter Choice:</span><br></pre></td></tr></table></figure>
+<p>可以看到菜单里有选项9与选项a，这就是上文添加的两个功能，选择9按下，等待雷达给出选项Select Network Mode：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">[IPU1-0]  Select Network Mode,</span><br><span class="line">[IPU1-0]  --------------------</span><br><span class="line">[IPU1-0]  1: TFDTP</span><br><span class="line">[IPU1-0]  2: TCP/IP</span><br><span class="line">[IPU1-0]</span><br><span class="line">[IPU1-0]  Enter Choice:</span><br></pre></td></tr></table></figure>
+<p>选项1是TI 针对级联雷达开发的一种基于 UDP 的轻量化、极速网络流传输协议。</p>
+<h2 id="好了，后面的工作还没做-等我慢慢更新"><a href="#好了，后面的工作还没做-等我慢慢更新" class="headerlink" title="好了，后面的工作还没做~等我慢慢更新"></a>好了，后面的工作还没做~等我慢慢更新</h2></article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://lzrxdd.github.io">Azusa</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://lzrxdd.github.io/2026/07/03/firmware%20development%20experience_1/">https://lzrxdd.github.io/2026/07/03/firmware%20development%20experience_1/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://lzrxdd.github.io" target="_blank">Azusa的数据库</a>！</span></div></div><div class="tag_share"><div class="post-share"><div class="social-share" data-image="/img/butterfly-icon.png" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/butterfly-icon.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Azusa</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">1</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">0</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80-%E7%A0%94%E7%A9%B6%E8%83%8C%E6%99%AF"><span class="toc-number">1.</span> <span class="toc-text">一. 研究背景</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-1-%E8%AE%BE%E5%A4%87%E7%BB%84%E6%88%90"><span class="toc-number">1.1.</span> <span class="toc-text">1.1 设备组成</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-2-%E5%8A%9F%E8%83%BD"><span class="toc-number">1.2.</span> <span class="toc-text">1.2 功能</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C-%E5%BC%80%E5%A7%8B%E5%8A%A8%E6%89%8B"><span class="toc-number">2.</span> <span class="toc-text">二. 开始动手</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83"><span class="toc-number">2.1.</span> <span class="toc-text">2.1 开发环境</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-%E4%BF%AE%E6%94%B9%E6%96%87%E4%BB%B6"><span class="toc-number">2.2.</span> <span class="toc-text">2.2 修改文件</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-%E7%BC%96%E8%AF%91"><span class="toc-number">2.3.</span> <span class="toc-text">2.3 编译</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-4-%E4%BF%9D%E5%AD%98%E4%B8%8E%E4%B8%8A%E7%94%B5"><span class="toc-number">2.4.</span> <span class="toc-text">2.4 保存与上电</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%A5%BD%E4%BA%86%EF%BC%8C%E5%90%8E%E9%9D%A2%E7%9A%84%E5%B7%A5%E4%BD%9C%E8%BF%98%E6%B2%A1%E5%81%9A-%E7%AD%89%E6%88%91%E6%85%A2%E6%85%A2%E6%9B%B4%E6%96%B0"><span class="toc-number">3.</span> <span class="toc-text">好了，后面的工作还没做~等我慢慢更新</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/07/03/firmware%20development%20experience_1/" title="AWR2243固件开发学习经验_1">AWR2243固件开发学习经验_1</a><time datetime="2026-07-03T05:50:03.000Z" title="发表于 2026-07-03 13:50:03">2026-07-03</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Azusa</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.5.4</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
